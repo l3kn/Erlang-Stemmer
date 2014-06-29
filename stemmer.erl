@@ -1,5 +1,5 @@
 -module(stemmer).
--export([stem/1, stemDebug/1, stemString/1, isVowel/1, containsVowel/1
+-export([stem/1, stemString/1, isVowel/1, containsVowel/1
         ,r1/1, r2/1, endsShort/1, isShortR/1, testDiffs/0, getDiffs/0]).
 
 -import(lists, [filter/2, sum/1, reverse/1, member/2, map/2]).
@@ -34,42 +34,44 @@ stem(Word) when length(Word) < 3 -> Word;
 stem(Word) -> string:to_lower(exception0(
               prepare1(prepare0(string:to_lower(Word))))).
 
-exception0("skis") -> "ski";
-exception0("skies") -> "sky";
-exception0("dying") -> "die";
-exception0("lying") -> "lie";
-exception0("tying") -> "tie";
-exception0("idly") -> "idl";
-exception0("gently") -> "gentl";
-exception0("ugly") -> "ugli";
-exception0("early") -> "earli";
-exception0("only") -> "onli";
-exception0("singly") -> "singl";
+-define(do_nothing_e0(W), exception0(W) -> W).
+-define(replace_e0(W,R), exception0(W) -> R).
 
-exception0(W="sky") -> W;
-exception0(W="news") -> W;
-exception0(W="howe") -> W;
-exception0(W="atlas") -> W;
-exception0(W="cosmos") -> W;
-exception0(W="bias") -> W;
-exception0(W="andes") -> W;
+?replace_e0("skis", "ski");
+?replace_e0("skies", "sky");
+?replace_e0("dying", "die");
+?replace_e0("lying", "lie");
+?replace_e0("tying", "tie");
+?replace_e0("idly", "idl");
+?replace_e0("gently", "gentl");
+?replace_e0("ugly", "ugli");
+?replace_e0("early", "earli");
+?replace_e0("only", "onli");
+?replace_e0("singly", "singl");
+
+?do_nothing_e0("sky");
+?do_nothing_e0("news");
+?do_nothing_e0("howe");
+?do_nothing_e0("atlas");
+?do_nothing_e0("cosmos");
+?do_nothing_e0("bias");
+?do_nothing_e0("andes");
 
 exception0(Word) -> reverse(exception1(step0(step1A(reverse(Word))))).
 
-exception1(W="gninni") -> W;
-exception1(W="gnituo") -> W;
-exception1(W="gninnac") -> W;
-exception1(W="gnirreh") -> W;
-exception1(W="gnirrae") -> W;
-exception1(W="deecorp") -> W;
-exception1(W="deecxe") -> W;
-exception1(W="deeccus") -> W;
+-define(do_nothing_e1(W), exception1(W) -> W).
+
+?do_nothing_e1("gninni");
+?do_nothing_e1("gnituo");
+?do_nothing_e1("gninnac");
+?do_nothing_e1("gnirreh");
+?do_nothing_e1("gnirrae");
+?do_nothing_e1("deecorp");
+?do_nothing_e1("deecxe");
+?do_nothing_e1("deeccus");
 
 exception1(Word) ->
   step5(step4(step3(step2(step1C(step1B(Word)))))).
-
-stemDebug(Word) ->
-  io:fwrite(Word).
 
 %% Prepare
 
@@ -81,18 +83,22 @@ prepare1(Word) -> re:replace(Word,"(?<=[aeiouy])y" ,"Y",[{return, list}]).
 
 %% Step 0
 
-step0("'s'" ++ Word) -> Word;
-step0("s'" ++ Word) -> Word;
-step0("'" ++ Word) -> Word;
+-define(remove0(S), step0(S ++ Word) -> Word).
+
+?remove0("'s'");
+?remove0("s'");
+?remove0("'");
 step0(Word) -> Word.
 
 %% Step 1A
 
-step1A("sess" ++ Word) -> "ss" ++ Word;
-step1A("sei" ++ Word) -> step1A_ie(Word);
-step1A("dei" ++ Word) -> step1A_ie(Word);
-step1A("ss" ++ Word) -> "ss" ++ Word;
-step1A("su" ++ Word) -> "su" ++ Word;
+-define(replace1A(S, R), step1A(S ++ Word) -> R ++ Word).
+
+?replace1A("sess", "ss");
+step1A("sei" ++ Word) -> ie_helper(Word);
+step1A("dei" ++ Word) -> ie_helper(Word);
+?replace1A("ss", "ss");
+?replace1A("su", "su");
 
 step1A("s" ++ ([_|Xs] = Word)) ->
   case containsVowel(Xs) of
@@ -102,13 +108,16 @@ step1A("s" ++ ([_|Xs] = Word)) ->
 
 step1A(Word) -> Word.
 
-step1A_ie(Word) ->
+ie_helper(Word) ->
     if
       length(Word) > 1 -> "i" ++ Word;
       true -> "ei" ++ Word
     end.
 
 %% Step 1B
+
+-define(delete1B(S), step1B(S ++ Word) -> step1B_helper(Word, S)).
+
 step1B(("dee" ++ Word) = Full) ->
   case re:run(rev1(Full), "dee") of
     nomatch -> "dee" ++ Word;
@@ -121,10 +130,10 @@ step1B(("yldee" ++ Word) = Full) ->
     _       -> "ee" ++ Word
   end;
 
-step1B("de" ++ Word)    -> step1B_helper(Word, "de");
-step1B("ylde" ++ Word)  -> step1B_helper(Word, "ylde");
-step1B("gni" ++ Word)   -> step1B_helper(Word, "gni");
-step1B("ylgni" ++ Word) -> step1B_helper(Word, "ylgni");
+?delete1B("de");
+?delete1B("ylde");
+?delete1B("gni");
+?delete1B("ylgni");
 
 step1B(Word) -> Word.
 
@@ -174,29 +183,32 @@ step1C_y(_) -> false.
 
 %% Step 2
 
-step2("lanoita" ++ Word) -> step2_helper("lanoita", Word, "eta");
-step2("lanoit" ++ Word)  -> step2_helper("lanoit", Word, "noit");
-step2("icne" ++ Word)    -> step2_helper("icne", Word, "ecne");
-step2("icna" ++ Word)    -> step2_helper("icna", Word, "ecna");
-step2("ilba" ++ Word)    -> step2_helper("ilba", Word, "elba");
-step2("iltne" ++ Word)   -> step2_helper("iltne", Word, "tne");
-step2("rezi" ++ Word)    -> step2_helper("rezi", Word, "ezi");
-step2("noitazi" ++ Word) -> step2_helper("noitazi", Word, "ezi");
-step2("noita" ++ Word)   -> step2_helper("noita", Word, "eta");
-step2("rota" ++ Word)    -> step2_helper("rota", Word, "eta");
-step2("msila" ++ Word)   -> step2_helper("msila", Word, "la");
-step2("itila" ++ Word)   -> step2_helper("itila", Word, "la");
-step2("illa" ++ Word)    -> step2_helper("illa", Word, "la");
-step2("ssenluf" ++ Word) -> step2_helper("ssenluf", Word, "luf");
-step2("ilsuo" ++ Word)   -> step2_helper("ilsuo", Word, "suo");
-step2("ssensuo" ++ Word) -> step2_helper("ssensuo", Word, "suo");
-step2("ssenevi" ++ Word) -> step2_helper("ssenevi", Word, "evi");
-step2("itivi" ++ Word)   -> step2_helper("itivi", Word, "evi");
-step2("itilib" ++ Word)  -> step2_helper("itilib", Word, "elb");
-step2("ilb" ++ Word)     -> step2_helper("ilb", Word, "elb");
+-define(replace2(S, R), step2(S ++ Word) -> step2_helper(S, Word, R)).
+
+?replace2("lanoita", "eta");
+?replace2("lanoit", "noit");
+?replace2("icne", "ecne");
+?replace2("icna", "ecna");
+?replace2("ilba", "elba");
+?replace2("iltne", "tne");
+?replace2("rezi", "ezi");
+?replace2("noitazi", "ezi");
+?replace2("noita", "eta");
+?replace2("rota", "eta");
+?replace2("msila", "la");
+?replace2("itila", "la");
+?replace2("illa", "la");
+?replace2("ssenluf", "luf");
+?replace2("ilsuo", "suo");
+?replace2("ssensuo", "suo");
+?replace2("ssenevi", "evi");
+?replace2("itivi", "evi");
+?replace2("itilib", "elb");
+?replace2("ilb", "elb");
+?replace2("illuf", "luf");
+?replace2("ilssel", "ssel");
+
 step2("igol" ++ Word)    -> step2_helper("igo", "l" ++ Word, "go");
-step2("illuf" ++ Word)   -> step2_helper("illuf", Word, "luf");
-step2("ilssel" ++ Word)  -> step2_helper("ilssel", Word, "ssel");
 
 step2("il" ++ ([X|_Xs] = Word)) -> 
   case member(X, "cdeghkmnrt") of
@@ -214,13 +226,16 @@ step2_helper(Suffix, Rest, Replace) ->
 
 %% Step3
 
-step3("lanoita" ++ Word)  -> step3_helper("lanoita", Word, "eta");
-step3("lanoit" ++ Word)   -> step3_helper("lanoit", Word, "noit");
-step3("ezila" ++ Word)    -> step3_helper("ezila", Word, "la");
-step3("etaci" ++ Word)    -> step3_helper("etaci", Word, "ci");
-step3("itici" ++ Word)    -> step3_helper("itici", Word, "ci");
-step3("laci" ++ Word)     -> step3_helper("laci", Word, "ci");
-step3("luf" ++ Word)      -> step3_helper("luf", Word, "");
+-define(replace3(S, R), step3(S ++ Word) -> step3_helper(S, Word, R)).
+
+?replace3("lanoita", "eta");
+?replace3("lanoit", "noit");
+?replace3("ezila", "la");
+?replace3("etaci", "ci");
+?replace3("itici", "ci");
+?replace3("laci", "ci");
+?replace3("luf", "");
+
 step3("ssen" ++ Word)     -> step3_helper("ssen", Word, "");
 step3("evita" ++ Word)    ->
   case re:run(rev2("evita" ++ Word), "evita") of
@@ -238,23 +253,25 @@ step3_helper(Suffix, Rest, Replace) ->
 
 %% Step4
 
-step4("la" ++ Word) -> step4_helper("la", Word, "");
-step4("ecna" ++ Word) -> step4_helper("ecna", Word, "");
-step4("ecne" ++ Word) -> step4_helper("ecne", Word, "");
-step4("re" ++ Word) -> step4_helper("re", Word, "");
-step4("ci" ++ Word) -> step4_helper("ci", Word, "");
-step4("elba" ++ Word) -> step4_helper("elba", Word, "");
-step4("elbi" ++ Word) -> step4_helper("elbi", Word, "");
-step4("tna" ++ Word) -> step4_helper("tna", Word, "");
-step4("tneme" ++ Word) -> step4_helper("tneme", Word, "");
-step4("tnem" ++ Word) -> step4_helper("tnem", Word, "");
-step4("tne" ++ Word) -> step4_helper("tne", Word, "");
-step4("msi" ++ Word) -> step4_helper("msi", Word, "");
-step4("eta" ++ Word) -> step4_helper("eta", Word, "");
-step4("iti" ++ Word) -> step4_helper("iti", Word, "");
-step4("suo" ++ Word) -> step4_helper("suo", Word, "");
-step4("evi" ++ Word) -> step4_helper("evi", Word, "");
-step4("ezi" ++ Word) -> step4_helper("ezi", Word, "");
+-define(delete4(S), step4(S ++ Word) -> step4_helper(S, Word, "")).
+
+?delete4("la");
+?delete4("ecna");
+?delete4("ecne");
+?delete4("re");
+?delete4("ci");
+?delete4("elba");
+?delete4("elbi");
+?delete4("tna");
+?delete4("tneme");
+?delete4("tnem");
+?delete4("tne");
+?delete4("msi");
+?delete4("eta");
+?delete4("iti");
+?delete4("suo");
+?delete4("evi");
+?delete4("ezi");
 
 step4("nois" ++ Word) ->
   case re:run(rev2("nois" ++ Word), "noi") of
