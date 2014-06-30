@@ -55,9 +55,8 @@ pre0(Word) -> Word.
 pre1("y" ++ Word) -> "Y" ++ Word;
 pre1(Word) -> re:replace(Word,"(?<=[aeiouy])y" ,"Y",[{return, list}]).
 
-
 %% Step 0
-%%
+
 -define(remove0(S), step0(S ++ Word) -> Word).
 
 ?remove0("'s'");
@@ -196,20 +195,8 @@ step2(Word) -> Word.
 
 step3("ssen" ++ Word)     -> r1_helper(Word, "ssen", "ssen", "");
 step3("evita" ++ Word)    -> r2_helper(Word, "evita", "evita", "");
-
 step3(Word) -> Word.
 
-r2_helper(Word, S, Rep1, Rep2) ->
-  case inR2(S ++ Word, S) of
-    true  -> Rep2 ++ Word;
-    false -> Rep1 ++ Word
-  end.
-
-r1_helper(Word, S, Rep1, Rep2) ->
-  case inR1(S ++ Word, S) of
-    true  -> Rep2 ++ Word;
-    false -> Rep1 ++ Word
-  end.
 
 %% Step4
 
@@ -267,6 +254,18 @@ includes(Word, String) ->
   case re:run(Word, String) of
     nomatch -> false;
     _       -> true
+  end.
+
+r2_helper(Word, S, Rep1, Rep2) ->
+  case inR2(S ++ Word, S) of
+    true  -> Rep2 ++ Word;
+    false -> Rep1 ++ Word
+  end.
+
+r1_helper(Word, S, Rep1, Rep2) ->
+  case inR1(S ++ Word, S) of
+    true  -> Rep2 ++ Word;
+    false -> Rep1 ++ Word
   end.
 
 rev1(Word) -> reverse(r1(reverse(Word))).
