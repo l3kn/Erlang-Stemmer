@@ -1,28 +1,11 @@
 -module(stemmer).
--export([stem/1, stemString/1, testDiffs/0, getDiffs/0]).
+-export([stem/1, stemString/1, r1/1, r2/1]).
 
--import(lists, [filter/2, sum/1, reverse/1, member/2, map/2]).
-
-getDiffs() ->
-  {ok, Binary} = file:read_file("diffs.csv"),
-  Lines = string:tokens(binary_to_list(Binary), "\n"),
-  Pairs = map(fun(X) -> string:tokens(X, ",") end, Lines),
-  filter(fun(X) -> testDiff(X) =:= 1 end, Pairs).
-
-testDiffs() ->
-  {ok, Binary} = file:read_file("diffs.csv"), %% TODO: Exceptions
-  Lines = string:tokens(binary_to_list(Binary), "\n"),
-  Pairs = map(fun(X) -> string:tokens(X, ",") end, Lines),
-  sum(map(fun(X) -> testDiff(X) end, Pairs)) / length(Lines) * 100.
-
-testDiff([From, To]) -> 
-  case stem(From) of
-    To -> 0;
-    _  -> 1
-  end.
+-import(lists, [reverse/1, member/2, map/2]).
+-import(string, [tokens/2, to_lower/1]).
 
 stemString(String) ->
-  Words = string:tokens(string:to_lower(String), " "),
+  Words = tokens(to_lower(String), " "),
   Stems = map(fun(X) -> stem(X) end, Words),
   string:join(Stems, " ").
 
@@ -50,22 +33,21 @@ stemString(String) ->
 ?do_nothing("andes");
 
 stem(Word) when length(Word) > 2 ->
-  Low = string:to_lower(Word),
+  Low = to_lower(Word),
   Pre = pre1(pre0(Low)),
   Rev = reverse(Pre),
   W1  = step1A(step0(Rev)),
-  Ex  = ["gninni", "gnituo", "gninnac", "gnirreh", "gnirrae", "deecorp", "deecxe", "deeccus"],
+  Ex  = ["gninni", "gnituo", "gninnac" ,"gnirreh"
+        ,"gnirrae", "deecorp", "deecxe", "deeccus"],
   W2 = case member(W1, Ex) of 
     true -> W1;
     _    -> step5(step4(step3(step2(step1C(step1B(W1))))))
   end,
-  string:to_lower(reverse(W2));
+  to_lower(reverse(W2));
 
 stem(Word) -> Word.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Prepare
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 pre0("'" ++ Word) -> Word;
 pre0(Word) -> Word.
@@ -73,10 +55,9 @@ pre0(Word) -> Word.
 pre1("y" ++ Word) -> "Y" ++ Word;
 pre1(Word) -> re:replace(Word,"(?<=[aeiouy])y" ,"Y",[{return, list}]).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Step 0
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% Step 0
+%%
 -define(remove0(S), step0(S ++ Word) -> Word).
 
 ?remove0("'s'");
@@ -85,9 +66,7 @@ pre1(Word) -> re:replace(Word,"(?<=[aeiouy])y" ,"Y",[{return, list}]).
 
 step0(Word) -> Word.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Step 1A
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(replace1A(S, R), step1A(S ++ Word) -> R ++ Word).
 
@@ -111,10 +90,7 @@ ie_helper(Word) ->
       true -> "ei" ++ Word
     end.
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Step 1B
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(delete1B(S), step1B(S ++ Word) -> step1B_helper(Word, S)).
 
@@ -136,7 +112,7 @@ step1B_helper(Word, A) ->
 
 step1B2([X1,X2|Xs] = Word) ->
   End1  = member(([X1] ++ [X2]), ["ta", "lb", "zi"]),
-  End2  = (X1 =:= X2) and member(X1, doubles()),
+  End2  = (X1 =:= X2) and isDouble(X1),
   Short = isShortR(Word),
   if
     End1 or Short -> "e" ++ Word;
@@ -144,9 +120,7 @@ step1B2([X1,X2|Xs] = Word) ->
     true -> Word
   end.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Step 1C
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 step1C("y" ++ Word) ->
   case step1C_y(Word) of
@@ -171,9 +145,7 @@ step1C_y([X|Xs]) ->
 
 step1C_y(_) -> false.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Step 2
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(replace2(S, R), step2(S ++ Word) -> r1_helper(Word, S, S, R)).
 
@@ -203,16 +175,14 @@ step1C_y(_) -> false.
 step2("igol" ++ Word) -> r1_helper("l" ++ Word, "igo", "igo", "go");
 
 step2("il" ++ ([X|_Xs] = Word)) -> 
-  case member(X, "cdeghkmnrt") of
+  case isLiEnding(X) of
     true -> r1_helper(Word, "il", "il", "");
     _    -> "il" ++ Word
   end;
 
 step2(Word) -> Word.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Step3
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(replace3(S, R), step3(S ++ Word) -> r1_helper(Word, S, S, R)).
 
@@ -230,20 +200,18 @@ step3("evita" ++ Word)    -> r2_helper(Word, "evita", "evita", "");
 step3(Word) -> Word.
 
 r2_helper(Word, S, Rep1, Rep2) ->
-  case re:run(rev2(S ++ Word), S) of
-    nomatch -> Rep1 ++ Word;
-    _       -> Rep2 ++ Word
+  case inR2(S ++ Word, S) of
+    true  -> Rep2 ++ Word;
+    false -> Rep1 ++ Word
   end.
 
 r1_helper(Word, S, Rep1, Rep2) ->
-  case re:run(rev1(S ++ Word), S) of
-    nomatch -> Rep1 ++ Word;
-    _       -> Rep2 ++ Word
+  case inR1(S ++ Word, S) of
+    true  -> Rep2 ++ Word;
+    false -> Rep1 ++ Word
   end.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Step4
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 -define(delete4(S), step4(S ++ Word) -> r2_helper(Word, S, S, "")).
 
@@ -270,9 +238,7 @@ step4("noit" ++ Word) -> r2_helper("t" ++ Word, "noi", "noi", "");
 
 step4(Word) -> Word.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Step 5
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 step5("e" ++ Word) ->
   R1 = inR1("e" ++ Word, "e"),
@@ -286,29 +252,21 @@ step5("e" ++ Word) ->
 step5("ll" ++ Word) -> r2_helper("l" ++ Word, "l", "l", "");
 step5(Word) -> Word.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Helper Functions
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-doubles() -> "bdfgmnprt".
-
-isVowel(C) -> (C == $a) or (C == $e) or (C == $i) or 
-              (C == $o) or (C == $u) or (C == $y).
-
+isDouble(C)    -> member(C, "bdfgmnprt").
+isLiEnding(C)  -> member(C, "cdeghkmnrt").
+isVowel(C)     -> member(C, "aeiouy").
+isVowelExt(C)  -> member(C, "aeiouyYwx").
 isConsonant(C) -> not isVowel(C).
 
-inR1(Word, String) ->
-  R1 = rev1(Word),
-  case re:run(R1, String) of
-    nomatch -> false;
-    _       -> true %%not ((R1 =:= String) or (R1 =:= [String]))
-  end.
+inR1(Word, String) -> includes(rev1(Word), String).
+inR2(Word, String) -> includes(rev2(Word), String).
 
-inR2(Word, String) ->
-  R2 = rev2(Word),
-  case re:run(R2, String) of
+includes(Word, String) ->
+  case re:run(Word, String) of
     nomatch -> false;
-    _       -> true %%not((R2 =:= String) or (R2 =:= [String]))
+    _       -> true
   end.
 
 rev1(Word) -> reverse(r1(reverse(Word))).
@@ -316,35 +274,30 @@ rev2(Word) -> reverse(r2(reverse(Word))).
 
 r1("gener" ++ Word) -> Word;
 r1("commun" ++ Word) -> Word;
-r1("arsen" ++ Word) ->
-  Word;
-
+r1("arsen" ++ Word) -> Word;
 r1(Word) -> r1_(Word).
 
 r1_([X1,X2|Xs]) ->
-  V = isVowel(X1),
-  C = isConsonant(X2),
-  if
-    V and C -> Xs;
-    true    -> r1_([X2|Xs])
+  case isVowel(X1) and isConsonant(X2) of
+    true -> Xs;
+    _    -> r1_([X2|Xs])
   end;
 
-r1_(_) -> [].
+r1_(_) -> "".
 
 r2(Word) -> r1_(r1(Word)).
 
 isShortR(Word) -> (rev1(Word) =:= []) and endsShortR(Word).
 
-endsShortR([X1,X2]) -> (not isVowel(X1)) and isVowel(X2);
+endsShortR([X1,X2]) -> isConsonant(X1) and isVowel(X2);
 endsShortR([X1,X2,X3|_]) ->
-  (not member(X1, "aeiouyYwx")) and
-  member(X2, "aeiouy") and
-  (not member(X3, "aeiouy"));
+  (not isVowelExt(X1)) and isVowel(X2) and isConsonant(X3);
 endsShortR(_) -> false.
 
+containsVowel([X|Xs]) ->
+  case isVowel(X) of
+    true -> true;
+    _    -> containsVowel(Xs)
+  end;
 
-containsVowel(Word) ->
-  case re:run(Word, "[aeuoiy]") of
-    nomatch -> false;
-    _       -> true
-  end.
+containsVowel([]) -> false.
